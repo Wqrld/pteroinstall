@@ -64,12 +64,12 @@ installpanel() {
 	curl -fsSL https://packages.redis.io/gpg | sudo gpg --dearmor -o /usr/share/keyrings/redis-archive-keyring.gpg
 	echo "deb [signed-by=/usr/share/keyrings/redis-archive-keyring.gpg] https://packages.redis.io/deb $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/redis.list
 
-	curl -sS https://downloads.mariadb.com/MariaDB/mariadb_repo_setup | bash
+	curl -LsS https://r.mariadb.com/downloads/mariadb_repo_setup | sudo bash
 	apt update
 
     output "Installing panel dependencies"
 	# install panel dependencies
-	apt -y install php8.1 php8.1-{cli,gd,mysql,pdo,mbstring,tokenizer,bcmath,xml,fpm,curl,zip} mariadb-server nginx tar unzip git redis-server fail2ban
+	apt -y install php8.3 php8.3-{cli,gd,mysql,pdo,mbstring,tokenizer,bcmath,xml,fpm,curl,zip} mariadb-server nginx tar unzip git redis-server fail2ban
 	# get composer
 	curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 
@@ -187,7 +187,7 @@ server {
     }
     location ~ \.php$ {
         fastcgi_split_path_info ^(.+\.php)(/.+)$;
-        fastcgi_pass unix:/run/php/php8.1-fpm.sock;
+        fastcgi_pass unix:/run/php/php8.3-fpm.sock;
         fastcgi_index index.php;
         include fastcgi_params;
         fastcgi_param PHP_VALUE "upload_max_filesize = 100M \n post_max_size=100M";
@@ -250,6 +250,7 @@ mariadb() {
         output "Password: $adminpassword"
         output "###############################################################"
         output ""
+  echo "Mysql root password is $rootpassword" > /root/mysqlroot.txt 
 }
 
 choices() {
