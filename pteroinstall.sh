@@ -240,19 +240,24 @@ ssl() {
 }
 
 mariadb() {
-  output "###############################################################"
-        output "MARIADB/MySQL INFORMATION"
-        output ""
-        output "Your MariaDB/MySQL root password is $rootpassword"
-        output ""
-        output "Create your MariaDB/MySQL host with the following information:"
-        output "Host: $SERVER_IP"
-        output "Port: 3306"
-        output "User: admin"
-        output "Password: $adminpassword"
-        output "###############################################################"
-        output ""
-  echo "Mysql root password is $rootpassword" > /root/mysqlroot.txt 
+    output "###############################################################"
+    output "MARIADB/MySQL INFORMATION"
+    output ""
+    output "Your MariaDB/MySQL root password is $rootpassword"
+    output ""
+    output "Creating a MariaDB/MySQL host with the following information:"
+    output "Host: $SERVER_IP"
+    output "Port: 3306"
+    output "User: admin"
+    output "Password: $adminpassword"
+    output "###############################################################"
+    output ""
+    echo "Mysql root password is $rootpassword" > /root/mysqlroot.txt 
+
+    # Encrypt the password using Laravel's Crypt facade via artisan tinker
+    encrypted_password=$(php /var/www/pterodactyl/artisan tinker --execute="echo app('encrypter')->encrypt('$adminpassword');" | tr -d '\n')
+    # Insert the row into database_hosts
+    mysql panel -e "INSERT INTO database_hosts (name, host, port, username, password, node_id, created_at, updated_at) VALUES ('main', '$SERVER_IP', 3306, 'admin', '$encrypted_password', 1, NOW(), NOW());"
 }
 
 choices() {
