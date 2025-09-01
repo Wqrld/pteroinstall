@@ -15,6 +15,52 @@ if [ "$key" != "" ]; then
 fi
 }
 
+gather_machine_specs() {
+    # Gather machine specifications for node creation
+    CPU_CORES=$(nproc)
+    RAM_MB=$(free -m | awk 'NR==2{printf "%d", $2}')
+    DISK_MB=$(df / | awk 'NR==2{printf "%d", $2/1024}')
+    
+    output "Detected machine specifications:"
+    output "  CPU Cores: $CPU_CORES"
+    output "  RAM: ${RAM_MB}MB"
+    output "  Disk: ${DISK_MB}MB"
+}
+
+create_node() {
+    # Check if we have database access (only works when panel is also installed)
+    if ! mysql panel -e "SELECT 1" &>/dev/null; then
+        output "Database not available - skipping automatic node creation"
+        output "Note: Automatic node creation only works when installing panel and daemon together"
+        output "Please create the node manually in the panel and configure the daemon"
+        return 1
+    fi
+    
+    # Generate a unique UUID for the node
+    NODE_UUID=$(cat /proc/sys/kernel/random/uuid)
+    NODE_NAME="Auto-$(hostname -s)"
+    NODE_DESCRIPTION="Automatically created node for $(hostname -f)"
+    
+    output "Creating node in database..."
+    output "  Node Name: $NODE_NAME"
+    output "  Node UUID: $NODE_UUID"
+    output "  FQDN: $FQDN"
+    
+    # Insert the node into the nodes table
+    mysql panel -e "INSERT INTO nodes (uuid, public, name, description, location_id, fqdn, scheme, behind_proxy, maintenance_mode, memory, memory_overallocate, disk, disk_overallocate, upload_size, daemon_listen, daemon_sftp, daemon_base, created_at, updated_at) VALUES ('$NODE_UUID', 1, '$NODE_NAME', '$NODE_DESCRIPTION', 1, '$FQDN', 'https', 0, 0, $RAM_MB, 0, $DISK_MB, 0, 100, 8080, 2022, '/var/lib/pterodactyl/volumes', NOW(), NOW());"
+    
+    if [ $? -eq 0 ]; then
+        output "Node created successfully!"
+        # Get the node ID for later use
+        NODE_ID=$(mysql panel -sN -e "SELECT id FROM nodes WHERE uuid='$NODE_UUID';")
+        output "Node ID: $NODE_ID"
+        return 0
+    else
+        output "Failed to create node in database"
+        exit 1
+    fi
+}
+
 installdaemon() {
     output "Installing docker"
     curl -sSL https://get.docker.com/ | CHANNEL=stable bash
@@ -25,9 +71,37 @@ installdaemon() {
     curl -L -o /usr/local/bin/wings https://github.com/pterodactyl/wings/releases/latest/download/wings_linux_amd64
     chmod u+x /usr/local/bin/wings
 
-    output "Add node on panel, server ip: $SERVER_IP"
-    read choice
-    eval $choice
+    # Gather machine specs and attempt to create node automatically
+    gather_machine_specs
+    if create_node; then
+        output "Creating wings configuration with auto-generated node..."
+        # Generate wings configuration with the created node
+        cat > /etc/pterodactyl/config.yml << EOF
+debug: false
+uuid: $NODE_UUID
+token_id: $NODE_UUID
+token: $NODE_UUID
+api:
+  host: 0.0.0.0
+  port: 8080
+  ssl:
+    enabled: true
+    cert: /etc/letsencrypt/live/$FQDN/fullchain.pem
+    key: /etc/letsencrypt/live/$FQDN/privkey.pem
+  upload_limit: 100
+system:
+  data: /var/lib/pterodactyl/volumes
+  sftp:
+    bind_port: 2022
+allowed_mounts: []
+allowed_origins: []
+EOF
+    else
+        output "Manual node configuration required"
+        output "Add node on panel, server ip: $SERVER_IP"
+        output "After creating the node, copy the configuration to /etc/pterodactyl/config.yml"
+        read -p "Press enter when you have configured the node..."
+    fi
 
     output "Put daemon into systemd"
     cat > /etc/systemd/system/wings.service <<- 'EOF'
@@ -256,8 +330,8 @@ mariadb() {
 
     # Encrypt the password using Laravel's Crypt facade via artisan tinker
     encrypted_password=$(php /var/www/pterodactyl/artisan tinker --execute="echo app('encrypter')->encrypt('$adminpassword');" | tr -d '\n')
-    # Insert the row into database_hosts
-    mysql panel -e "INSERT INTO database_hosts (name, host, port, username, password, node_id, created_at, updated_at) VALUES ('main', '$SERVER_IP', 3306, 'admin', '$encrypted_password', 1, NOW(), NOW());"
+    # Insert the row into database_hosts using the dynamically created node ID
+    mysql panel -e "INSERT INTO database_hosts (name, host, port, username, password, node_id, created_at, updated_at) VALUES ('main', '$SERVER_IP', 3306, 'admin', '$encrypted_password', $NODE_ID, NOW(), NOW());"
 }
 
 choices() {
