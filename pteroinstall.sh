@@ -54,6 +54,27 @@ create_node() {
         # Get the node ID for later use
         NODE_ID=$(mysql panel -sN -e "SELECT id FROM nodes WHERE uuid='$NODE_UUID';")
         output "Node ID: $NODE_ID"
+        
+        output ""
+        output "###############################################################"
+        output "AUTOMATIC NODE CREATION COMPLETED"
+        output ""
+        output "A node has been automatically created with the following details:"
+        output "  Name: $NODE_NAME"
+        output "  UUID: $NODE_UUID"
+        output "  FQDN: $FQDN"
+        output "  Memory: ${RAM_MB}MB"
+        output "  Disk: ${DISK_MB}MB"
+        output ""
+        output "IMPORTANT: To complete the daemon configuration:"
+        output "1. Log into your Pterodactyl panel at https://$FQDN"
+        output "2. Go to Admin -> Nodes"
+        output "3. Click on the '$NODE_NAME' node"
+        output "4. Click 'Configuration' tab"
+        output "5. Copy the configuration to /etc/pterodactyl/config.yml"
+        output "###############################################################"
+        output ""
+        
         return 0
     else
         output "Failed to create node in database"
@@ -74,28 +95,8 @@ installdaemon() {
     # Gather machine specs and attempt to create node automatically
     gather_machine_specs
     if create_node; then
-        output "Creating wings configuration with auto-generated node..."
-        # Generate wings configuration with the created node
-        cat > /etc/pterodactyl/config.yml << EOF
-debug: false
-uuid: $NODE_UUID
-token_id: $NODE_UUID
-token: $NODE_UUID
-api:
-  host: 0.0.0.0
-  port: 8080
-  ssl:
-    enabled: true
-    cert: /etc/letsencrypt/live/$FQDN/fullchain.pem
-    key: /etc/letsencrypt/live/$FQDN/privkey.pem
-  upload_limit: 100
-system:
-  data: /var/lib/pterodactyl/volumes
-  sftp:
-    bind_port: 2022
-allowed_mounts: []
-allowed_origins: []
-EOF
+        output "Node created automatically! Please complete the configuration as instructed above."
+        output "The daemon service will be created but not started until configuration is complete."
     else
         output "Manual node configuration required"
         output "Add node on panel, server ip: $SERVER_IP"
