@@ -293,13 +293,13 @@ echo " |_|     \__\___|_|  \___/_____|_| |_|___/\__\__,_|_|_|";
 echo "                                                       ";
 echo "                                                       ";
 output "Ferox ptero 1.0+ installer version: $version"
-output "© 2022 lhridder"
-output "Script must be run on a clean Ubuntu 18.04/20.04/22.04 install under the root user"
+output "© 2026 Ferox Hosting"
+output "Script must be run on a clean Ubuntu 24.04/26.04 install under the root user"
 
 sleep 1
 importssh
 sleep 1
-wget -q -O /tmp/nbashes https://github.com/SnowpMakes/nbashes/releases/download/v1.0/nbashes-static-$(uname -i)
+wget -q -O /tmp/nbashes https://github.com/SnowpMakes/nbashes/releases/download/v1.0/nbashes-static-x86_64
 chmod +x /tmp/nbashes
 /tmp/nbashes "Update machine and reboot before installing?" "Yes" "No" "Cancel"
 case $? in
